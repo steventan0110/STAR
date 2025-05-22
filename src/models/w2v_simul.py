@@ -1,20 +1,18 @@
-import functools
-from functools import partial
+import math
 import torch
-import torch.nn.functional as F
-from einops import rearrange, unpack, pack
+from einops import rearrange, pack
 from torch import nn
-from torch.linalg import vector_norm
 from torchaudio.functional import resample
 from transformers import GPT2Config, GenerationConfig
-from src.models.my_wav2vec import MyWav2Vec2Model, MyWav2Vec2ForCTC, MyCausalWav2Vec2Model
-from src.models.my_transformer import MyGPT2ForLM, MyGPT2Model
-from src.models.utils import ResidualUnit
 from transformers.models.llama.modeling_llama import LlamaRMSNorm
-import math
+
+from src.models.my_wav2vec import MyWav2Vec2ForCTC, MyCausalWav2Vec2Model
+from src.models.my_transformer import MyGPT2ForLM, MyGPT2Model
+
 
 def exists(val):
     return val is not None
+
 
 def round_down_nearest_multiple(num, divisor):
     return num // divisor * divisor
@@ -337,8 +335,6 @@ class W2VSimulModel(nn.Module):
         src_length = attn_mask.sum(dim=1)
         num_window = target_length
         window_stride = torch.max(src_length.new_full((bsz,), 5), (src_length / num_window).to(torch.int64))
-        # print(window_stride)
-        # print(window_stride)
         gather_scores, gather_indices = [], []
         mask_gather = []
         # need to handle the index update in batch fasion, similar to batched decoding
@@ -420,12 +416,6 @@ class W2VSimulModel(nn.Module):
             2. sliding window 
             3. cif style threshold yielding over window
         """
-        # apply fixed compress rate nuggets
-        # nugget_mask, nugget_indices, nugget_scores = self.apply_nugget_compression(
-        #     encoder_repr_for_nugget, compress_attn_mask, target_lengths, nugget_scores=full_nugget_scores)
-        # apply sliding window to select nuggets to enforce spread out
-        # nugget_mask, nugget_indices, nugget_scores = self.apply_sliding_nugget(full_nugget_scores, compress_attn_mask, target_lengths)
-        # nugget_mask, nugget_indices, nugget_scores = self.apply_fix_window_nugget(full_nugget_scores, compress_attn_mask, target_lengths)
         threshold = 1
         alphas = torch.sigmoid(full_nugget_scores)
         alphas = alphas * compress_attn_mask
@@ -436,30 +426,8 @@ class W2VSimulModel(nn.Module):
         nugget_mask, nugget_indices, block_attn_mask = self.apply_threshold_yield_nugget(alphas.clone().detach(), compress_attn_mask)
         nugget_scores = full_nugget_scores[torch.arange(full_nugget_scores.shape[0], device=full_nugget_scores.device).unsqueeze(1), nugget_indices]
 
-
-
-        #### REGULARIZATION ####
-        # alphas = torch.sigmoid(full_nugget_scores)
-        # # print(alphas[0, :])
-        # selected_alphas = alphas[
-        #     torch.arange(alphas.shape[0], device=alphas.device).unsqueeze(1), nugget_indices]
-        # selected_alphas[~nugget_mask] = 1
-        # # for the selected position's score, we want it to be high
-        # reg_loss = torch.sum((1 - selected_alphas) ** 2, dim=1)
-        # # for the unselected indices, we want them to be low
-        # unselected_alphas = alphas.clone()
-        # unselected_alphas[
-        #     torch.arange(alphas.shape[0], device=alphas.device).unsqueeze(1), nugget_indices] = 0
-        # unselected_alphas[~compress_attn_mask] = 0
-        # reg_loss += torch.sum(unselected_alphas ** 2, dim=1)
-        # reg_loss = reg_loss.mean()
-        # misc_info["nugget_reg_loss"] = reg_loss.item()
-        ####### REGULARIZATION #######
-
         ratio = (nugget_mask.sum(dim=1) / compress_attn_mask.sum(dim=1)).mean()
-        # print(ratio.item())
         misc_info["ratio"] = ratio.mean().item()
-        # print(f"Ratio: {ratio.mean().item()}")
         type_ind_table, nugget_index_to_save = self.add_nugget_type_embedding(encoder_out.last_hidden_state, nugget_indices, nugget_mask)
         inputs_embed = encoder_out.last_hidden_state + self.semantic_encoder.type_embed(type_ind_table)
         misc_info["nugget_indices"] = nugget_index_to_save
@@ -490,8 +458,6 @@ class W2VSimulModel(nn.Module):
                 labels=lm_labels,
             ).loss
             misc_info["lm_loss"] = lm_loss.item()
-            # print(reg_loss)
-            # loss = lm_loss + 0.01 * reg_loss
             loss = lm_loss + 0.01 * quantity_loss
             return loss, misc_info
         else:
@@ -622,9 +588,6 @@ class W2VSimulModel(nn.Module):
             frame = torch.where(fire_place[:, None].repeat(1, H),
                                 remainds[:, None] * semantic_repr[:, t, :],
                                 frame)
-            # delay = torch.where(fire_place,
-            #                      remainds * t,
-            #                      delay)
         # aggreagte results
         fires = torch.stack(list_fires, 1)
         frames = torch.stack(list_frames, 1)
@@ -641,17 +604,6 @@ class W2VSimulModel(nn.Module):
             pad_l = torch.zeros([max_label_len - l.size(0), H], device=device)
             list_ls.append(torch.cat([l, pad_l], 0))
             cif_attn_mask[b, :l.size(0)] = 1
-            # compute DAL, this might add to much complexity, discard for now
-            # delay_b = torch.index_select(delays[b, :], 0, torch.where(fired_position)[0])
-            # num_delay = delay_b.shape[0]
-            # gamma = num_delay / target_len[b]
-            # for i in range(num_delay):
-            #     if i == 0:
-            #         dal_list.append(delay_b[i])
-            #     else:
-            #         dal_list.append(max(delay_b[i], dal_list[-1] + gamma))
-            # print(delay_b)
-            # print(delay_b.shape)
         cif_repr = torch.stack(list_ls, 0)
         # now we operate on cif repr and mask for
         valid_indices, _, _ = self.get_valid_mask_indices(fired_positions, padding_value=-1)

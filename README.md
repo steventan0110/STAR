@@ -1,5 +1,5 @@
 # [STAR: Speech Translation and Recognition Framework](https://arxiv.org/abs/2402.01172)
-**Weiting Tan Yunmo Chen Tongfei Chen Guanghui Qin Haoran Xu Heidi C. Zhang Benjamin Van Durme Philipp Koehn**
+**Weiting Tan, Yunmo Chen, Tongfei Chen, Guanghui Qin, Haoran Xu, Heidi C. Zhang, Benjamin Van Durme, and  Philipp Koehn**
 
 <p align="center">
 <a href="LICENSE" alt="MIT License"><img src="https://img.shields.io/badge/license-MIT-FAD689.svg" /></a>
@@ -48,10 +48,18 @@ STAR/
 
 ---
 
-## Non-Streaming Experiments
-In section 3 of our paper, we present non-streaming experiments. The training script can be found in `/scripts/non_streaming.sh` and the argument `  --nugget_compress_rate ` controls the compression rate. For details of the segmenter training, please refer to 
-![alt text](compression.png)
+## Experiments
+### Non-Streaming Compression
+In section 3 of our paper, we present non-streaming experiments. The training script can be found in `/scripts/non_streaming.sh` and the argument `  --nugget_compress_rate ` controls the compression rate. For details of the segmenter training, please track how `scorer_logits` are updated in [my_transformer.py](https://github.com/steventan0110/STAR/blob/main/src/models/my_transformer.py#L117). 
 
+<img src="compression.png" alt="compression visualization" width="500" />
+
+### Simultaneous Speech-to-Text Experiments
+The training script is provided in `simul_s2t.sh`. The training is overall very similar to non-streaming compression, except that we add regularization to the scores following CIF so that the number of activation is close to the number of target tokens. Infinite-lookback can be activated by setting `--use_ilk` to True.
+
+![alt text](image.png)
+
+---
 
 ### If you find our work useful, please cite:
 ```

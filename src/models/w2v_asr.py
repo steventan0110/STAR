@@ -1,10 +1,9 @@
-import functools
+
 from functools import partial
 import torch
 import torch.nn.functional as F
-from einops import rearrange, unpack, pack
+from einops import rearrange, pack
 from torch import nn
-from torch.linalg import vector_norm
 from torchaudio.functional import resample
 from transformers import GPT2Config, GenerationConfig
 from src.models.utils import CausalConv1d

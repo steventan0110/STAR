@@ -42,7 +42,7 @@ nuggets_pretrain_steps=200000
 
 # Construct run name and output directory
 suffix="lr_${lr}_bz_${batch_size}_grad_acc_${grad_accum_every}_max_len_${max_seconds}s"
-run_name="${dataset_name}_w2v_simul_nugget_block_attn_${suffix}"
+run_name="${dataset_name}_w2v_simul_nugget_${suffix}"
 output_dir="$EXP_DIR/ckpt/soundstream/$run_name"
 
 # Create output directory
